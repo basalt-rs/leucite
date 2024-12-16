@@ -15,6 +15,7 @@
 //!     .add_read_only("/bin")
 //!     .add_read_write("/tmp/foo");
 //!
+//! // Execute `bash -i` in the `/tmp/foo` directory using the provided rules
 //! Command::new("bash")
 //!     .arg("-i")
 //!     .current_dir("/tmp/foo")
@@ -157,7 +158,7 @@ impl Rules {
     }
 }
 
-/// Command extensions for `tokio`'s [`tokio::Command`] type
+/// Command extensions for `tokio`'s `Command` type
 #[cfg(feature = "tokio")]
 pub mod tokio {
     use anyhow::Context;
