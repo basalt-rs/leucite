@@ -1,7 +1,7 @@
 //! # Sandbox
 //!
-//! This is a wrapper crate around [`rust-landlock`](https://docs.rs/landlock)
-//! that provides some abstractions and utilities for running commands.
+//! A wrapper crate around [`rust-landlock`](https://docs.rs/landlock) that provides useful
+//! abstractions and utilities
 //!
 //! ## Example
 //!
