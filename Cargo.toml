@@ -1,0 +1,19 @@
+[package]
+name = "sandbox"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+tokio = ["dep:tokio"]
+
+[dependencies]
+anyhow = "1.0.94"
+landlock = "0.4.1"
+tokio = { version = "1.42.0", features = ["process", "fs"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.42.0", features = ["full"] }
+tmpdir = "1.0.0"
+sandbox = { path = ".", features = ["tokio"] }
+tempdir = "0.3.7"
