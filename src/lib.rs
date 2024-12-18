@@ -6,7 +6,7 @@
 //! ## Example
 //!
 //! ```no_run
-//! # use sandbox::{Rules, CommandExt};
+//! # use leucite::{Rules, CommandExt};
 //! # use std::process::Command;
 //! let rules = Rules::new()
 //!     .add_read_only("/usr")
@@ -37,13 +37,13 @@ use std::{
 };
 
 #[cfg(not(target_os = "linux"))]
-compile_error!("`sandbox` must be run on linux.");
+compile_error!("`leucite` must be run on linux.");
 
 /// Struct which holds the rules for restrictions.  For more information, see [`Ruleset`].
 ///
 /// Example
 /// ```
-/// # use sandbox::Rules;
+/// # use leucite::Rules;
 /// let rules = Rules::new()
 ///     .add_read_only("/usr")
 ///     .add_read_only("/etc")

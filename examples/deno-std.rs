@@ -1,11 +1,11 @@
 use std::process::Command;
 
 use anyhow::Context;
-use sandbox::{CommandExt, Rules};
+use leucite::{CommandExt, Rules};
 use tempdir::TempDir;
 
 fn main() -> anyhow::Result<()> {
-    let tempdir = TempDir::new("sandbox").context("creating temp dir")?;
+    let tempdir = TempDir::new("leucite").context("creating temp dir")?;
 
     let rules = Rules::new()
         .add_read_only("/usr")

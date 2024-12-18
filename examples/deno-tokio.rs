@@ -1,11 +1,11 @@
 use anyhow::Context;
-use sandbox::{tokio::CommandExt, Rules};
+use leucite::{tokio::CommandExt, Rules};
 use tmpdir::TmpDir;
 use tokio::process::Command;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let tempdir = TmpDir::new("sandbox").await.context("creating temp dir")?;
+    let tempdir = TmpDir::new("leucite").await.context("creating temp dir")?;
 
     let rules = Rules::new()
         .add_read_only("/usr")
