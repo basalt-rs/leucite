@@ -2,6 +2,11 @@
 name = "leucite"
 version = "0.1.0"
 edition = "2021"
+description = "A wrapper crate around rust-landlock that provides useful abstractions and utilities"
+keywords = ["sandbox", "landlock"]
+repository = "https://github.com/basalt-rs/leucite"
+authors = ["funnyboy-roks <funnyboyroks@gmail.com>"]
+license = "Apache 2.0"
 
 [features]
 default = []
