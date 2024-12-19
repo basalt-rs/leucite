@@ -10,7 +10,6 @@ license = "Apache-2.0"
 
 [features]
 default = []
-tokio = ["dep:tokio"]
 
 [dependencies]
 anyhow = "1.0.94"
