@@ -206,6 +206,6 @@ impl CommandExt for Command {
                     .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
             })
         };
-        Ok(self.spawn()?)
+        self.spawn()
     }
 }
