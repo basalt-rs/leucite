@@ -189,7 +189,6 @@ pub mod tokio {
         }
     }
 }
-3
 
 /// Extension for std library's [`Command`] that grants the ability to spawn the command in a the
 /// restricted environment
