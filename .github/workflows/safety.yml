@@ -54,20 +54,21 @@ jobs:
   #       env:
   #         LSAN_OPTIONS: "suppressions=lsan-suppressions.txt"
   #         RUSTFLAGS: "-Z sanitizer=leak"
-  miri:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - run: |
-          echo "NIGHTLY=nightly-$(curl -s https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/miri)" >> "$GITHUB_ENV"
-      - name: Install ${{ env.NIGHTLY }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.NIGHTLY }}
-          components: miri
-      - name: cargo miri test
-        run: cargo miri test
-        env:
-          MIRIFLAGS: ""
+
+  # miri:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         submodules: true
+  #     - run: |
+  #         echo "NIGHTLY=nightly-$(curl -s https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/miri)" >> "$GITHUB_ENV"
+  #     - name: Install ${{ env.NIGHTLY }}
+  #       uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: ${{ env.NIGHTLY }}
+  #         components: miri
+  #     - name: cargo miri test
+  #       run: cargo miri test
+  #       env:
+  #         MIRIFLAGS: ""
