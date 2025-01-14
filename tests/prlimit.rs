@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{process::Stdio, sync::Arc};
 
 use anyhow::Context;
 use leucite::{CommandExt, MemorySize, Rules};
@@ -36,17 +36,26 @@ async fn prlimit_tokio() -> anyhow::Result<()> {
         .wait()
         .await?;
 
-    let exit = TokioCommand::new("./test")
+    let out = TokioCommand::new("./test")
         .current_dir(&tempdir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .env_clear()
         .max_memory(MemorySize::from_mb(5))
         .restrict(rules)
         .spawn()
         .context("spawning run command")?
-        .wait()
+        .wait_with_output()
         .await?;
 
-    assert_eq!(exit.code(), Some(69)); // code is that returned by the C program
+    // capture the stdout/sterr so that it is not logged when the test succeeds
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    stdout.lines().for_each(|l| println!("[STDOUT] {}", l));
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    stderr.lines().for_each(|l| println!("[STDERR] {}", l));
+
+    assert_eq!(out.status.code(), Some(69)); // code is that returned by the C program
 
     tempdir.close().await?;
 
@@ -81,16 +90,25 @@ fn prlimit_std() -> anyhow::Result<()> {
         .context("spawning compile command")?
         .wait()?;
 
-    let exit = StdCommand::new("./test")
+    let out = StdCommand::new("./test")
         .current_dir(&tempdir)
         .env_clear()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .max_memory(MemorySize::from_mb(5))
         .restrict(rules)
         .spawn()
         .context("spawning run command")?
-        .wait()?;
+        .wait_with_output()?;
 
-    assert_eq!(exit.code(), Some(69)); // code is that returned by the C program
+    // capture the stdout/sterr so that it is not logged when the test succeeds
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    stdout.lines().for_each(|l| println!("[STDOUT] {}", l));
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    stderr.lines().for_each(|l| println!("[STDERR] {}", l));
+
+    assert_eq!(out.status.code(), Some(69)); // code is that returned by the C program
 
     Ok(())
 }

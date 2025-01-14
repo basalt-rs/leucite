@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{process::Stdio, sync::Arc};
 
 use anyhow::Context;
 use leucite::{CommandExt, MemorySize, Rules};
@@ -32,18 +32,27 @@ async fn node_tokio() -> anyhow::Result<()> {
     )
     .await?;
 
-    let exit = TokioCommand::new("node")
+    let out = TokioCommand::new("node")
         .arg("run.js")
         .current_dir(&tempdir)
         .env_clear()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .restrict(rules)
         .max_memory(MemorySize::from_gb(1)) // Man, these javascript runtimes use a lot of memory...
         .spawn()
         .context("spawning command")?
-        .wait()
+        .wait_with_output()
         .await?;
 
-    assert_ne!(exit.code(), Some(0));
+    // capture the stdout/sterr so that it is not logged when the test succeeds
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    stdout.lines().for_each(|l| println!("[STDOUT] {}", l));
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    stderr.lines().for_each(|l| println!("[STDERR] {}", l));
+
+    assert_ne!(out.status.code(), Some(0));
 
     tempdir.close().await?;
 
@@ -74,17 +83,26 @@ fn node_std() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let exit = StdCommand::new("node")
+    let out = StdCommand::new("node")
         .arg("run.js")
         .current_dir(&tempdir)
         .env_clear()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .restrict(rules)
         .max_memory(MemorySize::from_gb(1)) // Man, these javascript runtimes use a lot of memory...
         .spawn()
         .context("spawning command")?
-        .wait()?;
+        .wait_with_output()?;
 
-    assert_ne!(exit.code(), Some(0));
+    // capture the stdout/sterr so that it is not logged when the test succeeds
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    stdout.lines().for_each(|l| println!("[STDOUT] {}", l));
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    stderr.lines().for_each(|l| println!("[STDERR] {}", l));
+
+    assert_ne!(out.status.code(), Some(0));
 
     Ok(())
 }
