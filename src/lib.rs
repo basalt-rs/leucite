@@ -6,7 +6,7 @@
 //! ## Example
 //!
 //! ```no_run
-//! # use leucite::{Rules, CommandExt};
+//! # use leucite::{Rules, CommandExt, MemorySize};
 //! # use std::process::Command;
 //! let rules = Rules::new()
 //!     .add_read_only("/usr")
@@ -20,7 +20,9 @@
 //!     .arg("-i")
 //!     .current_dir("/tmp/foo")
 //!     .env_clear()
-//!     .spawn_restricted(rules)?
+//!     .restrict(rules.into())
+//!     .max_memory(MemorySize::from_mb(100))
+//!     .spawn()?
 //!     .wait()?;
 //! # std::io::Result::Ok(())
 //! ```
@@ -29,12 +31,13 @@ use landlock::{
     path_beneath_rules, Access, AccessFs, AccessNet, NetPort, Ruleset, RulesetAttr,
     RulesetCreatedAttr, RulesetStatus, ABI,
 };
-use std::{
-    io,
-    os::unix::process::CommandExt as _,
-    path::PathBuf,
-    process::{Child, Command},
-};
+use prlimit::Limit;
+use std::{io, os::unix::process::CommandExt as _, path::PathBuf, process::Command, sync::Arc};
+#[cfg(feature = "tokio")]
+use tokio::process::Command as TokioCommand;
+
+mod prlimit;
+pub use prlimit::MemorySize;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("`leucite` must be run on linux.");
@@ -100,7 +103,7 @@ impl Rules {
     }
 
     /// Restrict the current thread using these rules
-    fn restrict(&self) -> anyhow::Result<()> {
+    pub fn restrict(&self) -> anyhow::Result<()> {
         let abi = ABI::V4;
         let rules = Ruleset::default()
             .handle_access(AccessFs::from_all(abi))
@@ -158,54 +161,90 @@ impl Rules {
     }
 }
 
-/// Command extensions for `tokio`'s `Command` type
-#[cfg(feature = "tokio")]
-pub mod tokio {
-    use anyhow::Context;
-    use tokio::{
-        io,
-        process::{Child, Command},
-    };
+fn anyhow_to_io<T>(res: anyhow::Result<T>) -> io::Result<T> {
+    res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+}
 
-    use crate::Rules;
+/// Extension for [`Command`] or [`tokio::process::Command`] that restricts a command once it is
+/// spawned to be limited in its environment
+pub trait CommandExt {
+    /// Restrict the filesystem access for this command based on the provided rules
+    fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self;
 
-    /// Extension for `tokio`'s [`Command`] that grants the ability to spawn the command in a the
-    /// restricted environment
-    pub trait CommandExt {
-        fn spawn_restricted(&mut self, rules: Rules) -> io::Result<Child>;
+    /// Restrict the filesystem access for this command based on the provided rules if `rules` is
+    /// `Some`
+    fn restrict_if(&mut self, rules: Option<Arc<Rules>>) -> &mut Self {
+        if let Some(rules) = rules {
+            self.restrict(rules)
+        } else {
+            self
+        }
     }
 
-    impl CommandExt for Command {
-        fn spawn_restricted(&mut self, rules: Rules) -> io::Result<Child> {
-            unsafe {
-                self.pre_exec(move || {
-                    rules
-                        .restrict()
-                        .context("creating restrictions")
-                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-                })
-            };
-            Ok(self.spawn()?)
+    /// Restrict the maxmimum memory usage for the command
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_DATA`
+    fn max_memory(&mut self, max_memory: MemorySize) -> &mut Self;
+
+    /// Restrict the maxmimum memory usage for the command if `max_memory` is `Some`
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_DATA`
+    fn max_memory_if(&mut self, max_memory: Option<MemorySize>) -> &mut Self {
+        if let Some(max_memory) = max_memory {
+            self.max_memory(max_memory)
+        } else {
+            self
+        }
+    }
+
+    /// Restrict the maximum file size that the command may create
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_FSIZE`
+    fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self;
+
+    /// Restrict the maximum file size that the command may create if `max_file_size` is `Some`
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_FSIZE`
+    fn max_file_size_if(&mut self, max_file_size: Option<MemorySize>) -> &mut Self {
+        if let Some(max_file_size) = max_file_size {
+            self.max_file_size(max_file_size)
+        } else {
+            self
         }
     }
 }
 
-/// Extension for std library's [`Command`] that grants the ability to spawn the command in a the
-/// restricted environment
-pub trait CommandExt {
-    fn spawn_restricted(&mut self, rules: Rules) -> io::Result<Child>;
+// This is okay since all of the functions have idential implementations for both StdCommand and
+// TokioCommand, if that ever changes, this will need to change.
+macro_rules! impl_cmd {
+    ($($t: tt)+) => {
+        impl CommandExt for Command {
+            $($t)+
+        }
+
+        #[cfg(feature = "tokio")]
+        impl CommandExt for TokioCommand {
+            $($t)+
+        }
+    }
 }
 
-impl CommandExt for Command {
-    fn spawn_restricted(&mut self, rules: Rules) -> io::Result<Child> {
+impl_cmd! {
+    fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
         unsafe {
-            self.pre_exec(move || {
-                rules
-                    .restrict()
-                    .context("creating restrictions")
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-            })
-        };
-        self.spawn()
+            self.pre_exec(move || anyhow_to_io(rules.restrict().context("creating restrictions")))
+        }
+    }
+
+    fn max_memory(&mut self, max_memory: MemorySize) -> &mut Self {
+        unsafe {
+            self.pre_exec(move || Limit::Data.limit(max_memory.bytes()))
+        }
+    }
+
+    fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self {
+        unsafe {
+            self.pre_exec(move || Limit::FileSize.limit(max_file_size.bytes()))
+        }
     }
 }
