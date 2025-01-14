@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use anyhow::Context;
-use leucite::{CommandExt, Rules};
+use leucite::{CommandExt, MemorySize, Rules};
 use tempdir::TempDir;
 
 fn main() -> anyhow::Result<()> {
@@ -31,7 +31,9 @@ fn main() -> anyhow::Result<()> {
         .arg("run.ts")
         .current_dir(&tempdir)
         .env_clear()
-        .spawn_restricted(rules)
+        .restrict(rules)
+        .max_memory(MemorySize::from_mb(100))
+        .spawn()
         .context("spawning command")?;
 
     println!("running command...");

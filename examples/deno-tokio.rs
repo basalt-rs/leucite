@@ -1,5 +1,5 @@
 use anyhow::Context;
-use leucite::{tokio::CommandExt, Rules};
+use leucite::{CommandExt, MemorySize, Rules};
 use tmpdir::TmpDir;
 use tokio::process::Command;
 
@@ -32,7 +32,9 @@ async fn main() -> anyhow::Result<()> {
         .arg("run.ts")
         .current_dir(&tempdir)
         .env_clear()
-        .spawn_restricted(rules)
+        .restrict(rules)
+        .max_memory(MemorySize::from_mb(100))
+        .spawn()
         .context("spawning command")?;
 
     println!("running command...");
