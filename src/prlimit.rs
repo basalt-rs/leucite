@@ -1,8 +1,4 @@
-use std::{
-    io,
-    ops::{Deref, DerefMut},
-    ptr,
-};
+use std::{io, ptr};
 
 use libc::rlimit;
 
@@ -10,38 +6,29 @@ use libc::rlimit;
 pub struct MemorySize(u64);
 
 macro_rules! impl_memsz {
-    ($fn: ident: $param: ident * $expr: expr) => {
+    ($from_fn: ident => $param: ident * $expr: expr) => {
         #[inline]
-        pub fn $fn($param: u64) -> Self {
+        pub fn $from_fn($param: u64) -> Self {
             Self($param * $expr)
+        }
+
+        #[inline]
+        pub fn $param(self) -> u64 {
+            self.0 / $expr
         }
     };
 }
 
-impl Deref for MemorySize {
-    type Target = u64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for MemorySize {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 impl MemorySize {
-    impl_memsz!(from_b: bytes * 1);
+    impl_memsz!(from_bytes => bytes * 1);
 
-    impl_memsz!(from_kb: kilobytes * 1000);
-    impl_memsz!(from_mb: megabytes * 1000 * 1000);
-    impl_memsz!(from_gb: gigabytes * 1000 * 1000 * 1000);
+    impl_memsz!(from_kb => kilobytes * 1000);
+    impl_memsz!(from_mb => megabytes * 1000 * 1000);
+    impl_memsz!(from_gb => gigabytes * 1000 * 1000 * 1000);
 
-    impl_memsz!(from_kib: kibibytes * 1024);
-    impl_memsz!(from_mib: mebibytes * 1024 * 1024);
-    impl_memsz!(from_gib: gibibytes * 1024 * 1024 * 1024);
+    impl_memsz!(from_kib => kibibytes * 1024);
+    impl_memsz!(from_mib => mebibytes * 1024 * 1024);
+    impl_memsz!(from_gib => gibibytes * 1024 * 1024 * 1024);
 }
 
 pub fn read_errno() -> io::Error {

@@ -171,15 +171,47 @@ pub trait CommandExt {
     /// Restrict the filesystem access for this command based on the provided rules
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self;
 
+    /// Restrict the filesystem access for this command based on the provided rules if `rules` is
+    /// `Some`
+    fn restrict_if(&mut self, rules: Option<Arc<Rules>>) -> &mut Self {
+        if let Some(rules) = rules {
+            self.restrict(rules)
+        } else {
+            self
+        }
+    }
+
     /// Restrict the maxmimum memory usage for the command
     ///
     /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_DATA`
     fn max_memory(&mut self, max_memory: MemorySize) -> &mut Self;
 
+    /// Restrict the maxmimum memory usage for the command if `max_memory` is `Some`
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_DATA`
+    fn max_memory_if(&mut self, max_memory: Option<MemorySize>) -> &mut Self {
+        if let Some(max_memory) = max_memory {
+            self.max_memory(max_memory)
+        } else {
+            self
+        }
+    }
+
     /// Restrict the maximum file size that the command may create
     ///
     /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_FSIZE`
     fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self;
+
+    /// Restrict the maximum file size that the command may create if `max_file_size` is `Some`
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_FSIZE`
+    fn max_file_size_if(&mut self, max_file_size: Option<MemorySize>) -> &mut Self {
+        if let Some(max_file_size) = max_file_size {
+            self.max_file_size(max_file_size)
+        } else {
+            self
+        }
+    }
 }
 
 // This is okay since all of the functions have idential implementations for both StdCommand and
@@ -206,13 +238,13 @@ impl_cmd! {
 
     fn max_memory(&mut self, max_memory: MemorySize) -> &mut Self {
         unsafe {
-            self.pre_exec(move || Limit::Data.limit(*max_memory))
+            self.pre_exec(move || Limit::Data.limit(max_memory.bytes()))
         }
     }
 
     fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self {
         unsafe {
-            self.pre_exec(move || Limit::FileSize.limit(*max_file_size))
+            self.pre_exec(move || Limit::FileSize.limit(max_file_size.bytes()))
         }
     }
 }
