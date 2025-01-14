@@ -1,18 +1,21 @@
-use std::process::Command;
+use std::{process::Command, sync::Arc};
 
 use anyhow::Context;
 use leucite::{CommandExt, MemorySize, Rules};
 use tempdir::TempDir;
 
-fn main() -> anyhow::Result<()> {
+#[test]
+fn deno_std() -> anyhow::Result<()> {
     let tempdir = TempDir::new("leucite").context("creating temp dir")?;
 
-    let rules = Rules::new()
-        .add_read_only("/usr")
-        .add_read_only("/etc")
-        .add_read_only("/dev")
-        .add_read_only("/bin")
-        .add_read_write(tempdir.path());
+    let rules = Arc::new(
+        Rules::new()
+            .add_read_only("/usr")
+            .add_read_only("/etc")
+            .add_read_only("/dev")
+            .add_read_only("/bin")
+            .add_read_write(tempdir.path()),
+    );
 
     let mut soln = tempdir.path().to_path_buf();
     soln.push("run.ts");
@@ -24,21 +27,19 @@ fn main() -> anyhow::Result<()> {
         "#,
     )?;
 
-    dbg!(&tempdir);
-    let mut child = Command::new("deno")
+    let exit = Command::new("deno")
         .arg("run")
         .arg("-A")
         .arg("run.ts")
         .current_dir(&tempdir)
         .env_clear()
         .restrict(rules)
-        .max_memory(MemorySize::from_mb(100))
+        .max_memory(MemorySize::from_gb(1)) // Deno seems to require a lot of memory
         .spawn()
-        .context("spawning command")?;
+        .context("spawning command")?
+        .wait()?;
 
-    println!("running command...");
-    let exit = child.wait()?;
-    println!("cmd done, exit = {:?}", exit);
+    assert_eq!(exit.code(), Some(1));
 
     Ok(())
 }

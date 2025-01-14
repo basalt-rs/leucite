@@ -20,7 +20,7 @@
 //!     .arg("-i")
 //!     .current_dir("/tmp/foo")
 //!     .env_clear()
-//!     .restrict(rules)
+//!     .restrict(rules.into())
 //!     .max_memory(MemorySize::from_mb(100))
 //!     .spawn()?
 //!     .wait()?;
@@ -32,7 +32,7 @@ use landlock::{
     RulesetCreatedAttr, RulesetStatus, ABI,
 };
 use prlimit::Limit;
-use std::{io, os::unix::process::CommandExt as _, path::PathBuf, process::Command};
+use std::{io, os::unix::process::CommandExt as _, path::PathBuf, process::Command, sync::Arc};
 #[cfg(feature = "tokio")]
 use tokio::process::Command as TokioCommand;
 
@@ -169,7 +169,7 @@ fn anyhow_to_io<T>(res: anyhow::Result<T>) -> io::Result<T> {
 /// spawned to be limited in its environment
 pub trait CommandExt {
     /// Restrict the filesystem access for this command based on the provided rules
-    fn restrict(&mut self, rules: Rules) -> &mut Self;
+    fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self;
 
     /// Restrict the maxmimum memory usage for the command
     ///
@@ -198,7 +198,7 @@ macro_rules! impl_cmd {
 }
 
 impl_cmd! {
-    fn restrict(&mut self, rules: Rules) -> &mut Self {
+    fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
         unsafe {
             self.pre_exec(move || anyhow_to_io(rules.restrict().context("creating restrictions")))
         }

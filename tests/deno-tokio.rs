@@ -1,18 +1,22 @@
+use std::sync::Arc;
+
 use anyhow::Context;
 use leucite::{CommandExt, MemorySize, Rules};
 use tmpdir::TmpDir;
 use tokio::process::Command;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+#[tokio::test]
+async fn deno_tokio() -> anyhow::Result<()> {
     let tempdir = TmpDir::new("leucite").await.context("creating temp dir")?;
 
-    let rules = Rules::new()
-        .add_read_only("/usr")
-        .add_read_only("/etc")
-        .add_read_only("/dev")
-        .add_read_only("/bin")
-        .add_read_write(tempdir.to_path_buf());
+    let rules = Arc::new(
+        Rules::new()
+            .add_read_only("/usr")
+            .add_read_only("/etc")
+            .add_read_only("/dev")
+            .add_read_only("/bin")
+            .add_read_write(tempdir.to_path_buf()),
+    );
 
     let mut soln = tempdir.to_path_buf();
     soln.push("run.ts");
@@ -25,21 +29,20 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
-    dbg!(&tempdir);
-    let mut child = Command::new("deno")
+    let exit = Command::new("deno")
         .arg("run")
         .arg("-A")
         .arg("run.ts")
         .current_dir(&tempdir)
         .env_clear()
         .restrict(rules)
-        .max_memory(MemorySize::from_mb(100))
+        .max_memory(MemorySize::from_gb(1)) // Deno seems to require a lot of memory
         .spawn()
-        .context("spawning command")?;
+        .context("spawning command")?
+        .wait()
+        .await?;
 
-    println!("running command...");
-    let exit = child.wait().await?;
-    println!("cmd done, exit = {:?}", exit);
+    assert_eq!(exit.code(), Some(1));
 
     Ok(())
 }
