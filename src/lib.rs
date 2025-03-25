@@ -41,16 +41,16 @@ compile_error!("`leucite` must be run on linux.");
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("setting filesystem access: {source}")]
-    AccessFs { source: landlock::RulesetError },
-    #[error("setting network access: {source}")]
-    AcessNet { source: landlock::RulesetError },
-    #[error("creating ruleset: {source}")]
-    CreateRuleset { source: landlock::RulesetError },
-    #[error("setting bind ports: {source}")]
-    SetBindPorts { source: landlock::RulesetError },
-    #[error("setting connect ports: {source}")]
-    SetConnectPorts { source: landlock::RulesetError },
+    #[error("setting filesystem access: {0}")]
+    AccessFs(landlock::RulesetError),
+    #[error("setting network access: {0}")]
+    AcessNet(landlock::RulesetError),
+    #[error("creating ruleset: {0}")]
+    CreateRuleset(landlock::RulesetError),
+    #[error("setting bind ports: {0}")]
+    SetBindPorts(landlock::RulesetError),
+    #[error("setting connect ports: {0}")]
+    SetConnectPorts(landlock::RulesetError),
     #[error("installed kernel does not support landlock")]
     LandlockNotSupported,
 }
@@ -120,11 +120,11 @@ impl Rules {
         let abi = ABI::V4;
         let rules = Ruleset::default()
             .handle_access(AccessFs::from_all(abi))
-            .map_err(|source| Error::AccessFs { source })?
+            .map_err(Error::AccessFs)?
             .handle_access(AccessNet::from_all(abi))
-            .map_err(|source| Error::AcessNet { source })?
+            .map_err(Error::AcessNet)?
             .create()
-            .map_err(|source| Error::CreateRuleset { source })?;
+            .map_err(Error::CreateRuleset)?;
 
         let rules = if self.bind_ports.is_empty() {
             rules.add_rule(NetPort::new(0, AccessNet::BindTcp))
@@ -135,7 +135,7 @@ impl Rules {
                     .map(|p| Ok(NetPort::new(*p, AccessNet::BindTcp))),
             )
         }
-        .map_err(|source| Error::SetBindPorts { source })?;
+        .map_err(Error::SetBindPorts)?;
 
         let rules = if self.connect_ports.is_empty() {
             rules.add_rule(NetPort::new(0, AccessNet::ConnectTcp))
@@ -146,26 +146,26 @@ impl Rules {
                     .map(|p| Ok(NetPort::new(*p, AccessNet::ConnectTcp))),
             )
         }
-        .map_err(|source| Error::SetConnectPorts { source })?;
+        .map_err(Error::SetConnectPorts)?;
 
         let status = rules
             .add_rules(path_beneath_rules(
                 &self.read_only,
                 AccessFs::from_read(abi),
             ))
-            .map_err(|source| Error::AccessFs { source })?
+            .map_err(Error::AccessFs)?
             .add_rules(path_beneath_rules(
                 &self.write_only,
                 AccessFs::from_write(abi),
             ))
-            .map_err(|source| Error::AccessFs { source })?
+            .map_err(Error::AccessFs)?
             .add_rules(path_beneath_rules(
                 &self.read_write,
                 AccessFs::from_all(abi),
             ))
-            .map_err(|source| Error::AccessFs { source })?
+            .map_err(Error::AccessFs)?
             .restrict_self()
-            .map_err(|source| Error::AccessFs { source })?;
+            .map_err(Error::AccessFs)?;
 
         if let RulesetStatus::NotEnforced = status.ruleset {
             return Err(Error::LandlockNotSupported);
