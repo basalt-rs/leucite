@@ -42,15 +42,15 @@ compile_error!("`leucite` must be run on linux.");
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("setting filesystem access: {0}")]
-    AccessFs(landlock::RulesetError),
+    AccessFs(#[source] landlock::RulesetError),
     #[error("setting network access: {0}")]
-    AcessNet(landlock::RulesetError),
+    AcessNet(#[source] landlock::RulesetError),
     #[error("creating ruleset: {0}")]
-    CreateRuleset(landlock::RulesetError),
+    CreateRuleset(#[source] landlock::RulesetError),
     #[error("setting bind ports: {0}")]
-    SetBindPorts(landlock::RulesetError),
+    SetBindPorts(#[source] landlock::RulesetError),
     #[error("setting connect ports: {0}")]
-    SetConnectPorts(landlock::RulesetError),
+    SetConnectPorts(#[source] landlock::RulesetError),
     #[error("installed kernel does not support landlock")]
     LandlockNotSupported,
 }
