@@ -24,7 +24,6 @@
 //!     .wait()?;
 //! # std::io::Result::Ok(())
 //! ```
-use anyhow::Context;
 use landlock::{
     path_beneath_rules, Access, AccessFs, AccessNet, NetPort, Ruleset, RulesetAttr,
     RulesetCreatedAttr, RulesetStatus, ABI,
@@ -39,6 +38,22 @@ pub use prlimit::MemorySize;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("`leucite` must be run on linux.");
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("setting filesystem access: {0}")]
+    AccessFs(#[source] landlock::RulesetError),
+    #[error("setting network access: {0}")]
+    AcessNet(#[source] landlock::RulesetError),
+    #[error("creating ruleset: {0}")]
+    CreateRuleset(#[source] landlock::RulesetError),
+    #[error("setting bind ports: {0}")]
+    SetBindPorts(#[source] landlock::RulesetError),
+    #[error("setting connect ports: {0}")]
+    SetConnectPorts(#[source] landlock::RulesetError),
+    #[error("installed kernel does not support landlock")]
+    LandlockNotSupported,
+}
 
 /// Struct which holds the rules for restrictions.  For more information, see [`Ruleset`].
 ///
@@ -101,15 +116,15 @@ impl Rules {
     }
 
     /// Restrict the current thread using these rules
-    pub fn restrict(&self) -> anyhow::Result<()> {
+    pub fn restrict(&self) -> Result<(), Error> {
         let abi = ABI::V4;
         let rules = Ruleset::default()
             .handle_access(AccessFs::from_all(abi))
-            .context("setting fs access")?
+            .map_err(Error::AccessFs)?
             .handle_access(AccessNet::from_all(abi))
-            .context("setting net access")?
+            .map_err(Error::AcessNet)?
             .create()
-            .context("creating ruleset")?;
+            .map_err(Error::CreateRuleset)?;
 
         let rules = if self.bind_ports.is_empty() {
             rules.add_rule(NetPort::new(0, AccessNet::BindTcp))
@@ -120,7 +135,7 @@ impl Rules {
                     .map(|p| Ok(NetPort::new(*p, AccessNet::BindTcp))),
             )
         }
-        .context("setting bind ports")?;
+        .map_err(Error::SetBindPorts)?;
 
         let rules = if self.connect_ports.is_empty() {
             rules.add_rule(NetPort::new(0, AccessNet::ConnectTcp))
@@ -131,36 +146,32 @@ impl Rules {
                     .map(|p| Ok(NetPort::new(*p, AccessNet::ConnectTcp))),
             )
         }
-        .context("setting connect ports")?;
+        .map_err(Error::SetConnectPorts)?;
 
         let status = rules
             .add_rules(path_beneath_rules(
                 &self.read_only,
                 AccessFs::from_read(abi),
             ))
-            .context("setting RO paths")?
+            .map_err(Error::AccessFs)?
             .add_rules(path_beneath_rules(
                 &self.write_only,
                 AccessFs::from_write(abi),
             ))
-            .context("setting WO paths")?
+            .map_err(Error::AccessFs)?
             .add_rules(path_beneath_rules(
                 &self.read_write,
                 AccessFs::from_all(abi),
             ))
-            .context("setting RW paths")?
+            .map_err(Error::AccessFs)?
             .restrict_self()
-            .context("creating restrictions")?;
+            .map_err(Error::AccessFs)?;
 
         if let RulesetStatus::NotEnforced = status.ruleset {
-            anyhow::bail!("Installed kernel does not support landlock.")
+            return Err(Error::LandlockNotSupported);
         }
         Ok(())
     }
-}
-
-fn anyhow_to_io<T>(res: anyhow::Result<T>) -> io::Result<T> {
-    res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
 }
 
 /// Extension for [`Command`] or [`tokio::process::Command`] that restricts a command once it is
@@ -230,7 +241,7 @@ macro_rules! impl_cmd {
 impl_cmd! {
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
         unsafe {
-            self.pre_exec(move || anyhow_to_io(rules.restrict().context("creating restrictions")))
+            self.pre_exec(move || rules.restrict().map_err(|e| io::Error::new(io::ErrorKind::Other, e)))
         }
     }
 

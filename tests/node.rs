@@ -1,6 +1,5 @@
 use std::{process::Stdio, sync::Arc};
 
-use anyhow::Context;
 use leucite::{CommandExt, MemorySize, Rules};
 use std::process::Command as StdCommand;
 use tempdir::TempDir;
@@ -8,8 +7,8 @@ use tmpdir::TmpDir;
 use tokio::process::Command as TokioCommand;
 
 #[tokio::test]
-async fn node_tokio() -> anyhow::Result<()> {
-    let tempdir = TmpDir::new("leucite").await.context("creating temp dir")?;
+async fn node_tokio() -> Result<(), Box<dyn std::error::Error>> {
+    let tempdir = TmpDir::new("leucite").await?;
 
     let rules = Arc::new(
         Rules::new()
@@ -40,8 +39,7 @@ async fn node_tokio() -> anyhow::Result<()> {
         .stderr(Stdio::piped())
         .restrict(rules)
         .max_memory(MemorySize::from_gb(1)) // Man, these javascript runtimes use a lot of memory...
-        .spawn()
-        .context("spawning command")?
+        .spawn()?
         .wait_with_output()
         .await?;
 
@@ -60,8 +58,8 @@ async fn node_tokio() -> anyhow::Result<()> {
 }
 
 #[test]
-fn node_std() -> anyhow::Result<()> {
-    let tempdir = TempDir::new("leucite").context("creating temp dir")?;
+fn node_std() -> Result<(), Box<dyn std::error::Error>> {
+    let tempdir = TempDir::new("leucite")?;
 
     let rules = Arc::new(
         Rules::new()
@@ -91,8 +89,7 @@ fn node_std() -> anyhow::Result<()> {
         .stderr(Stdio::piped())
         .restrict(rules)
         .max_memory(MemorySize::from_gb(1)) // Man, these javascript runtimes use a lot of memory...
-        .spawn()
-        .context("spawning command")?
+        .spawn()?
         .wait_with_output()?;
 
     // capture the stdout/sterr so that it is not logged when the test succeeds
