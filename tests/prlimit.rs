@@ -1,6 +1,5 @@
 use std::{process::Stdio, sync::Arc};
 
-use anyhow::Context;
 use leucite::{CommandExt, MemorySize, Rules};
 use std::process::Command as StdCommand;
 use tempdir::TempDir;
@@ -8,8 +7,8 @@ use tmpdir::TmpDir;
 use tokio::process::Command as TokioCommand;
 
 #[tokio::test]
-async fn prlimit_tokio() -> anyhow::Result<()> {
-    let tempdir = TmpDir::new("leucite").await.context("creating temp dir")?;
+async fn prlimit_tokio() -> Result<(), Box<dyn std::error::Error>> {
+    let tempdir = TmpDir::new("leucite").await?;
 
     let rules = Arc::new(
         Rules::new()
@@ -31,8 +30,7 @@ async fn prlimit_tokio() -> anyhow::Result<()> {
         .arg("-save-temps")
         .current_dir(&tempdir)
         .restrict(Arc::clone(&rules))
-        .spawn()
-        .context("spawning compile command")?
+        .spawn()?
         .wait()
         .await?;
 
@@ -43,8 +41,7 @@ async fn prlimit_tokio() -> anyhow::Result<()> {
         .env_clear()
         .max_memory(MemorySize::from_mb(5))
         .restrict(rules)
-        .spawn()
-        .context("spawning run command")?
+        .spawn()?
         .wait_with_output()
         .await?;
 
@@ -63,8 +60,8 @@ async fn prlimit_tokio() -> anyhow::Result<()> {
 }
 
 #[test]
-fn prlimit_std() -> anyhow::Result<()> {
-    let tempdir = TempDir::new("leucite").context("creating temp dir")?;
+fn prlimit_std() -> Result<(), Box<dyn std::error::Error>> {
+    let tempdir = TempDir::new("leucite")?;
 
     let rules = Arc::new(
         Rules::new()
@@ -86,8 +83,7 @@ fn prlimit_std() -> anyhow::Result<()> {
         .arg("-save-temps")
         .current_dir(&tempdir)
         .restrict(Arc::clone(&rules))
-        .spawn()
-        .context("spawning compile command")?
+        .spawn()?
         .wait()?;
 
     let out = StdCommand::new("./test")
@@ -97,8 +93,7 @@ fn prlimit_std() -> anyhow::Result<()> {
         .stderr(Stdio::piped())
         .max_memory(MemorySize::from_mb(5))
         .restrict(rules)
-        .spawn()
-        .context("spawning run command")?
+        .spawn()?
         .wait_with_output()?;
 
     // capture the stdout/sterr so that it is not logged when the test succeeds
