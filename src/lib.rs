@@ -1,5 +1,4 @@
-//! A wrapper crate around [`rust-landlock`](https://docs.rs/landlock) that provides useful
-//! abstractions and utilities
+//! A library for sandboxing and limiting command execution through Linux `landlock` and `prlimit`.
 //!
 //! ## Example
 //!

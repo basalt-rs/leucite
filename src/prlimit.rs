@@ -2,7 +2,8 @@ use std::{io, ptr};
 
 use libc::rlimit;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+/// Representation of some amount of digital space
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct MemorySize(u64);
 
 macro_rules! impl_memsz {

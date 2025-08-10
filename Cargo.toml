@@ -1,15 +1,16 @@
 [package]
 name = "leucite"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "A wrapper crate around rust-landlock that provides useful abstractions and utilities"
-keywords = ["sandbox", "landlock"]
+description = "A library for sandboxing and limiting command execution"
+keywords = ["sandbox", "landlock", "prlimit"]
 repository = "https://github.com/basalt-rs/leucite"
 authors = ["funnyboy-roks <funnyboyroks@gmail.com>"]
 license = "Apache-2.0"
 
 [features]
 default = []
+tokio = ["dep:tokio"]
 
 [dependencies]
 landlock = "0.4.1"
