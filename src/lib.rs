@@ -272,7 +272,7 @@ macro_rules! impl_cmd {
 impl_cmd! {
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
         unsafe {
-            self.pre_exec(move || rules.restrict().map_err(|e| io::Error::new(io::ErrorKind::Other, e)))
+            self.pre_exec(move || rules.restrict().map_err(io::Error::other))
         }
     }
 
