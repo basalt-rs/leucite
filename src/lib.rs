@@ -55,6 +55,8 @@ pub enum Error {
     SetBindPorts(#[source] landlock::RulesetError),
     #[error("setting connect ports: {0}")]
     SetConnectPorts(#[source] landlock::RulesetError),
+    #[error("restricting current thread: {0}")]
+    RestrictThread(#[source] landlock::RulesetError),
     #[error("installed kernel does not support landlock")]
     LandlockNotSupported,
 }
@@ -171,7 +173,7 @@ impl Rules {
             ))
             .map_err(Error::AccessFs)?
             .restrict_self()
-            .map_err(Error::AccessFs)?;
+            .map_err(Error::RestrictThread)?;
 
         if let RulesetStatus::NotEnforced = status.ruleset {
             return Err(Error::LandlockNotSupported);
