@@ -6,19 +6,21 @@
 //! ```no_run
 //! # use leucite::{Rules, CommandExt, MemorySize};
 //! # use std::process::Command;
-//! let rules = Rules::new()
-//!     .add_read_only("/usr")
-//!     .add_read_only("/etc")
-//!     .add_read_only("/dev")
-//!     .add_read_only("/bin")
-//!     .add_read_write("/tmp/foo");
 //!
 //! // Execute `bash -i` in the `/tmp/foo` directory using the provided rules
 //! Command::new("bash")
 //!     .arg("-i")
 //!     .current_dir("/tmp/foo")
 //!     .env_clear()
-//!     .restrict(rules.into())
+//!     .restrict(
+//!         Rules::new()
+//!             .add_read_only("/usr")
+//!             .add_read_only("/etc")
+//!             .add_read_only("/dev")
+//!             .add_read_only("/bin")
+//!             .add_read_write("/tmp/foo")
+//!             .into()
+//!     )
 //!     .max_memory(MemorySize::from_mb(100))
 //!     .spawn()?
 //!     .wait()?;

@@ -10,15 +10,6 @@ use tokio::process::Command as TokioCommand;
 async fn node_tokio() -> Result<(), Box<dyn std::error::Error>> {
     let tempdir = TmpDir::new("leucite").await?;
 
-    let rules = Arc::new(
-        Rules::new()
-            .add_read_only("/usr")
-            .add_read_only("/etc")
-            .add_read_only("/dev")
-            .add_read_only("/bin")
-            .add_read_write(tempdir.to_path_buf()),
-    );
-
     let mut soln = tempdir.to_path_buf();
     soln.push("run.js");
     tokio::fs::write(
@@ -37,7 +28,15 @@ async fn node_tokio() -> Result<(), Box<dyn std::error::Error>> {
         .env_clear()
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .restrict(rules)
+        .restrict(
+            Rules::new()
+                .add_read_only("/usr")
+                .add_read_only("/etc")
+                .add_read_only("/dev")
+                .add_read_only("/bin")
+                .add_read_write(tempdir.to_path_buf())
+                .into(),
+        )
         .max_memory(MemorySize::from_gb(1)) // Man, these javascript runtimes use a lot of memory...
         .spawn()?
         .wait_with_output()
