@@ -119,7 +119,9 @@ impl Rules {
         self
     }
 
-    /// Restrict the current thread using these rules
+    /// Restrict the _current thread_ using these rules
+    ///
+    /// To restrict a _command's execution_, see [`CommandExt::restrict`]
     pub fn restrict(&self) -> Result<(), Error> {
         let abi = ABI::V4;
         let rules = Ruleset::default()
