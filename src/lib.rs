@@ -36,6 +36,10 @@ use tokio::process::Command as TokioCommand;
 mod prlimit;
 pub use prlimit::MemorySize;
 
+mod private {
+    pub trait Sealed {}
+}
+
 #[cfg(not(target_os = "linux"))]
 compile_error!("`leucite` must be run on linux.");
 
@@ -176,7 +180,9 @@ impl Rules {
 
 /// Extension for [`Command`] or [`tokio::process::Command`] that restricts a command once it is
 /// spawned to be limited in its environment
-pub trait CommandExt {
+// Sealed as downstream implementations are very unlikely to be necessary and sealing this trait
+// allows us to add functions without being a breaking change
+pub trait CommandExt: private::Sealed {
     /// Restrict the filesystem access for this command based on the provided rules
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self;
 
@@ -227,10 +233,13 @@ pub trait CommandExt {
 // TokioCommand, if that ever changes, this will need to change.
 macro_rules! impl_cmd {
     ($($t: tt)+) => {
+        impl private::Sealed for Command {}
         impl CommandExt for Command {
             $($t)+
         }
 
+        #[cfg(feature = "tokio")]
+        impl private::Sealed for TokioCommand {}
         #[cfg(feature = "tokio")]
         impl CommandExt for TokioCommand {
             $($t)+
