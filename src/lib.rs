@@ -231,6 +231,22 @@ pub trait CommandExt: private::Sealed {
             self
         }
     }
+
+    /// Restrict the maximum number of threads that the command may create
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_NPROC`
+    fn max_threads(&mut self, max_threads: u64) -> &mut Self;
+
+    /// Restrict the maximum number of threads that the command may create if `max_threads` is `None`
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_NPROC`
+    fn max_threads_if(&mut self, max_threads: Option<u64>) -> &mut Self {
+        if let Some(max_threads) = max_threads {
+            self.max_threads(max_threads)
+        } else {
+            self
+        }
+    }
 }
 
 // This is okay since all of the functions have idential implementations for both StdCommand and
@@ -267,6 +283,12 @@ impl_cmd! {
     fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self {
         unsafe {
             self.pre_exec(move || Limit::FileSize.limit(max_file_size.bytes()))
+        }
+    }
+
+    fn max_threads(&mut self, max_threads: u64) -> &mut Self {
+        unsafe {
+            self.pre_exec(move || Limit::NumberProcesses.limit(max_threads))
         }
     }
 }
