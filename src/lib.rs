@@ -78,7 +78,7 @@ pub enum Error {
 ///     .add_connect_port(80)
 ///     .add_connect_port(443);
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Rules {
     read_only: Vec<PathBuf>,
     read_write: Vec<PathBuf>,
