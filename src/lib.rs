@@ -238,7 +238,7 @@ pub trait CommandExt: private::Sealed {
     /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_NPROC`
     fn max_threads(&mut self, max_threads: u64) -> &mut Self;
 
-    /// Restrict the maximum number of threads that the command may create if `max_threads` is `None`
+    /// Restrict the maximum number of threads that the command may create if `max_threads` is `Some`
     ///
     /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_NPROC`
     fn max_threads_if(&mut self, max_threads: Option<u64>) -> &mut Self {
