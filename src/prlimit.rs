@@ -2,7 +2,8 @@ use std::{io, ptr};
 
 use libc::rlimit;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+/// Representation of some amount of digital space
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct MemorySize(u64);
 
 macro_rules! impl_memsz {
@@ -31,13 +32,13 @@ impl MemorySize {
     impl_memsz!(from_gib => gibibytes * 1024 * 1024 * 1024);
 }
 
-pub fn read_errno() -> io::Error {
+pub(crate) fn read_errno() -> io::Error {
     io::Error::last_os_error()
 }
 
 #[repr(u32)]
 #[allow(unused)]
-pub enum Limit {
+pub(crate) enum Limit {
     Cpu = libc::RLIMIT_CPU,
     FileSize = libc::RLIMIT_FSIZE,
     Data = libc::RLIMIT_DATA,
@@ -64,12 +65,12 @@ fn into_rlimit(n: u64) -> libc::rlimit {
 }
 
 impl Limit {
-    pub fn limit(self, size: u64) -> io::Result<()> {
+    pub(crate) fn limit(self, size: u64) -> io::Result<()> {
         prlimit_self(self, into_rlimit(size))
     }
 }
 
-pub fn prlimit_self(kind: Limit, limit: rlimit) -> io::Result<()> {
+fn prlimit_self(kind: Limit, limit: rlimit) -> io::Result<()> {
     // SAFETY: this function should never crash based on input.  Any error is returned through
     // `errno` and we are handling that properly.
     let ret = unsafe {

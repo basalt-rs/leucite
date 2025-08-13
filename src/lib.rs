@@ -1,24 +1,25 @@
-//! A wrapper crate around [`rust-landlock`](https://docs.rs/landlock) that provides useful
-//! abstractions and utilities
+//! A library for sandboxing and limiting command execution through Linux `landlock` and `prlimit`.
 //!
 //! ## Example
 //!
 //! ```no_run
 //! # use leucite::{Rules, CommandExt, MemorySize};
 //! # use std::process::Command;
-//! let rules = Rules::new()
-//!     .add_read_only("/usr")
-//!     .add_read_only("/etc")
-//!     .add_read_only("/dev")
-//!     .add_read_only("/bin")
-//!     .add_read_write("/tmp/foo");
 //!
 //! // Execute `bash -i` in the `/tmp/foo` directory using the provided rules
 //! Command::new("bash")
 //!     .arg("-i")
 //!     .current_dir("/tmp/foo")
 //!     .env_clear()
-//!     .restrict(rules.into())
+//!     .restrict(
+//!         Rules::new()
+//!             .add_read_only("/usr")
+//!             .add_read_only("/etc")
+//!             .add_read_only("/dev")
+//!             .add_read_only("/bin")
+//!             .add_read_write("/tmp/foo")
+//!             .into()
+//!     )
 //!     .max_memory(MemorySize::from_mb(100))
 //!     .spawn()?
 //!     .wait()?;
@@ -36,6 +37,10 @@ use tokio::process::Command as TokioCommand;
 mod prlimit;
 pub use prlimit::MemorySize;
 
+mod private {
+    pub trait Sealed {}
+}
+
 #[cfg(not(target_os = "linux"))]
 compile_error!("`leucite` must be run on linux.");
 
@@ -51,6 +56,8 @@ pub enum Error {
     SetBindPorts(#[source] landlock::RulesetError),
     #[error("setting connect ports: {0}")]
     SetConnectPorts(#[source] landlock::RulesetError),
+    #[error("restricting current thread: {0}")]
+    RestrictThread(#[source] landlock::RulesetError),
     #[error("installed kernel does not support landlock")]
     LandlockNotSupported,
 }
@@ -70,7 +77,7 @@ pub enum Error {
 ///     .add_connect_port(80)
 ///     .add_connect_port(443);
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Rules {
     read_only: Vec<PathBuf>,
     read_write: Vec<PathBuf>,
@@ -115,7 +122,9 @@ impl Rules {
         self
     }
 
-    /// Restrict the current thread using these rules
+    /// Restrict the _current thread_ using these rules
+    ///
+    /// To restrict a _command's execution_, see [`CommandExt::restrict`]
     pub fn restrict(&self) -> Result<(), Error> {
         let abi = ABI::V4;
         let rules = Ruleset::default()
@@ -165,7 +174,7 @@ impl Rules {
             ))
             .map_err(Error::AccessFs)?
             .restrict_self()
-            .map_err(Error::AccessFs)?;
+            .map_err(Error::RestrictThread)?;
 
         if let RulesetStatus::NotEnforced = status.ruleset {
             return Err(Error::LandlockNotSupported);
@@ -176,7 +185,9 @@ impl Rules {
 
 /// Extension for [`Command`] or [`tokio::process::Command`] that restricts a command once it is
 /// spawned to be limited in its environment
-pub trait CommandExt {
+// Sealed as downstream implementations are very unlikely to be necessary and sealing this trait
+// allows us to add functions without being a breaking change
+pub trait CommandExt: private::Sealed {
     /// Restrict the filesystem access for this command based on the provided rules
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self;
 
@@ -221,16 +232,35 @@ pub trait CommandExt {
             self
         }
     }
+
+    /// Restrict the maximum number of threads that the command may create
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_NPROC`
+    fn max_threads(&mut self, max_threads: u64) -> &mut Self;
+
+    /// Restrict the maximum number of threads that the command may create if `max_threads` is `Some`
+    ///
+    /// See [`getrlimit(2)`](https://www.man7.org/linux/man-pages/man2/prlimit.2.html) and `RLIMIT_NPROC`
+    fn max_threads_if(&mut self, max_threads: Option<u64>) -> &mut Self {
+        if let Some(max_threads) = max_threads {
+            self.max_threads(max_threads)
+        } else {
+            self
+        }
+    }
 }
 
 // This is okay since all of the functions have idential implementations for both StdCommand and
 // TokioCommand, if that ever changes, this will need to change.
 macro_rules! impl_cmd {
     ($($t: tt)+) => {
+        impl private::Sealed for Command {}
         impl CommandExt for Command {
             $($t)+
         }
 
+        #[cfg(feature = "tokio")]
+        impl private::Sealed for TokioCommand {}
         #[cfg(feature = "tokio")]
         impl CommandExt for TokioCommand {
             $($t)+
@@ -241,7 +271,7 @@ macro_rules! impl_cmd {
 impl_cmd! {
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
         unsafe {
-            self.pre_exec(move || rules.restrict().map_err(|e| io::Error::new(io::ErrorKind::Other, e)))
+            self.pre_exec(move || rules.restrict().map_err(io::Error::other))
         }
     }
 
@@ -254,6 +284,12 @@ impl_cmd! {
     fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self {
         unsafe {
             self.pre_exec(move || Limit::FileSize.limit(max_file_size.bytes()))
+        }
+    }
+
+    fn max_threads(&mut self, max_threads: u64) -> &mut Self {
+        unsafe {
+            self.pre_exec(move || Limit::NumberProcesses.limit(max_threads))
         }
     }
 }
