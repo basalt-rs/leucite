@@ -122,10 +122,40 @@ impl Rules {
         self
     }
 
-    /// Restrict the _current thread_ using these rules
+    /// Restrict the _current process_ using these rules
     ///
     /// To restrict a _command's execution_, see [`CommandExt::restrict`]
+    ///
+    /// # Deprecated
+    ///
+    /// This function will be removed in version 2.0.0. Prefer using the unsafe function
+    /// [`Rules::restrict_self`], which has the same functionality, but is unsafe.
+    ///
+    /// # SAFETY
+    ///
+    /// Caller must ensure that all potential side-effects of calling this function have been
+    /// mitigated.  This includes, connections on ports that will be blocked, as well as file that
+    /// may no longer be accessible.
+    #[deprecate_until::deprecate_until(
+        since = "1.1.0",
+        remove = ">= 2.0.0",
+        note = "Prefer `Rules::restrict_self`"
+    )]
     pub fn restrict(&self) -> Result<(), Error> {
+        // SAFETY: This is unsafe, but this function must remain until 2.0.0.
+        unsafe { self.restrict_self() }
+    }
+
+    /// Restrict the _current process_ using these rules
+    ///
+    /// To restrict a _command's execution_, see [`CommandExt::restrict`]
+    ///
+    /// # SAFETY
+    ///
+    /// Caller must ensure that all potential side-effects of calling this function have been
+    /// mitigated.  This includes, connections on ports that will be blocked, as well as file that
+    /// may no longer be accessible.
+    pub unsafe fn restrict_self(&self) -> Result<(), Error> {
         let abi = ABI::V4;
         let rules = Ruleset::default()
             .handle_access(AccessFs::from_all(abi))
@@ -270,9 +300,10 @@ macro_rules! impl_cmd {
 
 impl_cmd! {
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
-        unsafe {
-            self.pre_exec(move || rules.restrict().map_err(io::Error::other))
-        }
+        // SAFETY: We are restricting in a new process, with nothing running, so restricting will
+        // break nothing
+        let inner = move || unsafe { rules.restrict_self() }.map_err(io::Error::other);
+        unsafe { self.pre_exec(inner) }
     }
 
     fn max_memory(&mut self, max_memory: MemorySize) -> &mut Self {
