@@ -13,14 +13,14 @@ default = []
 tokio = ["dep:tokio"]
 
 [dependencies]
-landlock = "0.4.1"
-libc = "0.2.169"
-thiserror = "2.0.12"
-tokio = { version = "1.42.0", features = ["process", "fs"], optional = true }
+landlock = "0.4.2"
+libc = "0.2.175"
+thiserror = "2.0.16"
+tokio = { version = "1.47.1", features = ["process", "fs"], optional = true }
 deprecate-until = "0.1.1"
 
 [dev-dependencies]
-tokio = { version = "1.42.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
 tmpdir = "1.0.0"
 leucite = { path = ".", features = ["tokio"] }
 tempdir = "0.3.7"
