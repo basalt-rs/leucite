@@ -300,25 +300,33 @@ macro_rules! impl_cmd {
 
 impl_cmd! {
     fn restrict(&mut self, rules: Arc<Rules>) -> &mut Self {
-        // SAFETY: We are restricting in a new process, with nothing running, so restricting will
+        // SAFETY: We are restricting in a new process with nothing running, so restricting will
         // break nothing
         let inner = move || unsafe { rules.restrict_self() }.map_err(io::Error::other);
+        // SAFETY: We don't allocate or de-allocate memory in the forked process before the call to
+        // `exec`.
         unsafe { self.pre_exec(inner) }
     }
 
     fn max_memory(&mut self, max_memory: MemorySize) -> &mut Self {
+        // SAFETY: We don't allocate or de-allocate memory in the forked process before the call to
+        // `exec`.
         unsafe {
             self.pre_exec(move || Limit::Data.limit(max_memory.bytes()))
         }
     }
 
     fn max_file_size(&mut self, max_file_size: MemorySize) -> &mut Self {
+        // SAFETY: We don't allocate or de-allocate memory in the forked process before the call to
+        // `exec`.
         unsafe {
             self.pre_exec(move || Limit::FileSize.limit(max_file_size.bytes()))
         }
     }
 
     fn max_threads(&mut self, max_threads: u64) -> &mut Self {
+        // SAFETY: We don't allocate or de-allocate memory in the forked process before the call to
+        // `exec`.
         unsafe {
             self.pre_exec(move || Limit::NumberProcesses.limit(max_threads))
         }

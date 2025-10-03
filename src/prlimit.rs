@@ -36,6 +36,13 @@ pub(crate) fn read_errno() -> io::Error {
     io::Error::last_os_error()
 }
 
+fn into_rlimit(n: u64) -> libc::rlimit {
+    rlimit {
+        rlim_cur: n,
+        rlim_max: n,
+    }
+}
+
 #[repr(u32)]
 #[allow(unused)]
 pub(crate) enum Limit {
@@ -57,34 +64,34 @@ pub(crate) enum Limit {
     RTTime = libc::RLIMIT_RTTIME,
 }
 
-fn into_rlimit(n: u64) -> libc::rlimit {
-    rlimit {
-        rlim_cur: n,
-        rlim_max: n,
+impl From<Limit> for libc::__rlimit_resource_t {
+    fn from(value: Limit) -> Self {
+        value as _
     }
 }
 
 impl Limit {
-    pub(crate) fn limit(self, size: u64) -> io::Result<()> {
-        prlimit_self(self, into_rlimit(size))
+    /// # SAFETY
+    ///
+    /// Caller must ensure that any resources that are already allocated by the process fall below
+    /// the limit set by this call.
+    pub(crate) unsafe fn limit(self, size: u64) -> io::Result<()> {
+        let limit = into_rlimit(size);
+        // SAFETY: this function should never crash based on input.  Any error is returned through
+        // `errno` and we are handling that properly.
+        let ret = unsafe {
+            libc::prlimit(
+                0,
+                libc::__rlimit_resource_t::from(self),
+                &limit as *const rlimit,
+                ptr::null_mut(),
+            )
+        };
+
+        if ret == 0 {
+            return Ok(());
+        }
+
+        Err(read_errno())
     }
-}
-
-fn prlimit_self(kind: Limit, limit: rlimit) -> io::Result<()> {
-    // SAFETY: this function should never crash based on input.  Any error is returned through
-    // `errno` and we are handling that properly.
-    let ret = unsafe {
-        libc::prlimit(
-            0,
-            kind as libc::__rlimit_resource_t,
-            &limit as *const rlimit,
-            ptr::null_mut(),
-        )
-    };
-
-    if ret == 0 {
-        return Ok(());
-    }
-
-    Err(read_errno())
 }
