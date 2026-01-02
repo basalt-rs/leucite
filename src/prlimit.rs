@@ -9,12 +9,12 @@ pub struct MemorySize(u64);
 macro_rules! impl_memsz {
     ($from_fn: ident => $param: ident * $expr: expr) => {
         #[inline]
-        pub fn $from_fn($param: u64) -> Self {
+        pub const fn $from_fn($param: u64) -> Self {
             Self($param * $expr)
         }
 
         #[inline]
-        pub fn $param(self) -> u64 {
+        pub const fn $param(self) -> u64 {
             self.0 / $expr
         }
     };
